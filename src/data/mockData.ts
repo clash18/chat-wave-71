@@ -172,26 +172,3 @@ export function generateTimestamp(): string {
 export function generateMessageId(): string {
   return `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 }
-
-export function generateMockMessages(): MessageData[] {
-  const messageTexts = [
-    "Hey there! How are you doing?",
-    "I'm working on a new project, would love to get your thoughts",
-    "Did you see the latest news about the tech conference?", 
-    "Let's catch up soon over coffee ☕",
-    "Thanks for your help yesterday!",
-    "The weather is beautiful today 🌞",
-    "How was your weekend?",
-    "I found this interesting article you might like"
-  ];
-
-  return messageTexts.map((text, index) => ({
-    id: generateMessageId(),
-    text,
-    timestamp: generateTimestamp(),
-    isSent: index % 3 === 0,
-    isDelivered: true,
-    isRead: Math.random() > 0.3,
-    senderName: index % 3 !== 0 ? "Contact" : undefined
-  }));
-}

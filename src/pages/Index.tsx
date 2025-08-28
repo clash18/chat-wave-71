@@ -1,133 +1,167 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { Navigation } from "@/components/layout/Navigation";
-import { ChatListSkeleton, ChatWindowSkeleton } from "@/components/layout/LoadingSkeleton";
 import { Sidebar } from "@/components/chat/Sidebar";
 import { ChatWindow } from "@/components/chat/ChatWindow";
 import { MobileLayout } from "@/components/chat/MobileLayout";
-import { useToast } from "@/hooks/use-toast";
-import { mockContacts, generateMockMessages } from "@/data/mockData";
-import type { MessageData } from "@/components/chat/Message";
+import { mockContacts, mockMessages, MessageData, generateTimestamp, generateMessageId } from "@/data/mockData";
+import { useIsMobile } from "@/hooks/use-mobile";
 
-export default function Index() {
-  const navigate = useNavigate();
-  const { toast } = useToast();
-  const [isDark, setIsDark] = useState(false);
-  const [selectedContactId, setSelectedContactId] = useState<string | undefined>();
-  const [messages, setMessages] = useState<MessageData[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    if (selectedContactId) {
-      setMessages(generateMockMessages());
+const Index = () => {
+  const [selectedContactId, setSelectedContactId] = useState<string>();
+  const [messages, setMessages] = useState<Record<string, MessageData[]>>(mockMessages);
+  const [isDark, setIsDark] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('theme') === 'dark' || 
+             (!localStorage.getItem('theme') && window.matchMedia('(prefers-color-scheme: dark)').matches);
     }
-  }, [selectedContactId]);
+    return false;
+  });
+  
+  const isMobile = useIsMobile();
 
   useEffect(() => {
-    // Simulate loading time
-    const timer = setTimeout(() => {
-      setIsLoading(false);
-    }, 1500);
-    
-    return () => clearTimeout(timer);
-  }, []);
-
-  const selectedContact = mockContacts.find(contact => contact.id === selectedContactId);
+    const root = window.document.documentElement;
+    if (isDark) {
+      root.classList.add('dark');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      root.classList.remove('dark');
+      localStorage.setItem('theme', 'light');
+    }
+  }, [isDark]);
 
   const handleContactSelect = (contactId: string) => {
     setSelectedContactId(contactId);
-    navigate(`/chat/${contactId}`);
+  };
+
+  const handleBackToContacts = () => {
+    setSelectedContactId(undefined);
   };
 
   const handleSendMessage = (messageText: string) => {
     if (!selectedContactId) return;
 
     const newMessage: MessageData = {
-      id: Date.now().toString(),
+      id: generateMessageId(),
       text: messageText,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      timestamp: generateTimestamp(),
       isSent: true,
-      isDelivered: true
+      isDelivered: true,
+      isRead: false
     };
 
-    setMessages(prev => [...prev, newMessage]);
+    setMessages(prev => ({
+      ...prev,
+      [selectedContactId]: [...(prev[selectedContactId] || []), newMessage]
+    }));
 
-    // Simulate response
+    // Simulate receiving a response after a short delay
     setTimeout(() => {
       const responses = [
+        "Thanks for your message!",
+        "Got it, I'll get back to you soon.",
         "That sounds great!",
-        "I agree with you.", 
-        "Thanks for sharing!",
-        "Interesting point of view.",
         "Let me think about that.",
-        "Sure, no problem!"
+        "Interesting point!",
+        "I completely agree with you.",
+        "Can you tell me more about that?",
+        "That's a brilliant idea!",
       ];
       
+      const randomResponse = responses[Math.floor(Math.random() * responses.length)];
+      const selectedContact = mockContacts.find(c => c.id === selectedContactId);
+      
       const responseMessage: MessageData = {
-        id: (Date.now() + 1).toString(),
-        text: responses[Math.floor(Math.random() * responses.length)],
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        id: generateMessageId(),
+        text: randomResponse,
+        timestamp: generateTimestamp(),
         isSent: false,
-        isDelivered: true,
-        isRead: true,
-        senderName: selectedContact?.name,
-        senderAvatar: selectedContact?.avatar
+        senderName: selectedContact?.name
       };
 
-      setMessages(prev => [...prev, responseMessage]);
-
-      toast({
-        title: "New message",
-        description: `${selectedContact?.name}: ${responseMessage.text}`,
-      });
+      setMessages(prev => ({
+        ...prev,
+        [selectedContactId]: [...(prev[selectedContactId] || []), responseMessage]
+      }));
     }, 1000 + Math.random() * 2000);
   };
 
-  const handleThemeToggle = () => {
-    setIsDark(!isDark);
-    document.documentElement.classList.toggle('dark');
-  };
+  const selectedContact = selectedContactId 
+    ? mockContacts.find(c => c.id === selectedContactId)
+    : undefined;
 
-  if (isLoading) {
+  const currentMessages = selectedContactId 
+    ? messages[selectedContactId] || []
+    : [];
+
+  const sidebar = (
+    <Sidebar
+      contacts={mockContacts}
+      selectedContactId={selectedContactId}
+      onContactSelect={handleContactSelect}
+      isDark={isDark}
+      onThemeToggle={() => setIsDark(!isDark)}
+    />
+  );
+
+  const chatWindow = (
+    <ChatWindow
+      contact={selectedContact}
+      messages={currentMessages}
+      onSendMessage={handleSendMessage}
+    />
+  );
+
+  if (isMobile) {
     return (
-      <div className={`h-screen flex flex-col ${isDark ? 'dark' : ''}`}>
-        <Navigation />
-        <div className="flex-1 flex overflow-hidden">
-          <ChatListSkeleton />
-          <ChatWindowSkeleton />
-        </div>
+      <div className="min-h-screen bg-background">
+        <main className="h-screen">
+          {selectedContactId ? (
+            <MobileLayout
+              sidebar={sidebar}
+              showBackButton={true}
+              onBack={handleBackToContacts}
+              contactName={selectedContact?.name}
+            >
+              {chatWindow}
+            </MobileLayout>
+          ) : (
+            <MobileLayout sidebar={sidebar}>
+              <div className="flex-1 flex items-center justify-center bg-chat-background">
+                <div className="text-center p-8">
+                  <div className="w-32 h-32 bg-muted rounded-full flex items-center justify-center mb-4 mx-auto">
+                    <svg 
+                      className="w-16 h-16 text-muted-foreground" 
+                      fill="none" 
+                      stroke="currentColor" 
+                      viewBox="0 0 24 24"
+                    >
+                      <path 
+                        strokeLinecap="round" 
+                        strokeLinejoin="round" 
+                        strokeWidth={1.5} 
+                        d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" 
+                      />
+                    </svg>
+                  </div>
+                  <h3 className="text-xl font-medium mb-2">Welcome to ChatApp</h3>
+                  <p className="text-muted-foreground">Select a conversation to start messaging</p>
+                </div>
+              </div>
+            </MobileLayout>
+          )}
+        </main>
       </div>
     );
   }
 
   return (
-    <div className={`h-screen flex flex-col ${isDark ? 'dark' : ''}`}>
-      <Navigation />
-      
-      <div className="flex-1 flex overflow-hidden">
-        <MobileLayout
-          sidebar={
-            <Sidebar
-              contacts={mockContacts}
-              selectedContactId={selectedContactId}
-              onContactSelect={handleContactSelect}
-              isDark={isDark}
-              onThemeToggle={handleThemeToggle}
-            />
-          }
-          showBackButton={!!selectedContactId}
-          onBack={() => {
-            setSelectedContactId(undefined);
-          }}
-          contactName={selectedContact?.name}
-        >
-          <ChatWindow
-            contact={selectedContact}
-            messages={messages}
-            onSendMessage={handleSendMessage}
-          />
-        </MobileLayout>
-      </div>
+    <div className="min-h-screen bg-background">
+      <main className="h-screen flex">
+        {sidebar}
+        {chatWindow}
+      </main>
     </div>
   );
-}
+};
+
+export default Index;
