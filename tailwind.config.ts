@@ -52,6 +52,18 @@ export default {
 					DEFAULT: 'hsl(var(--card))',
 					foreground: 'hsl(var(--card-foreground))'
 				},
+				'chat-sidebar': 'hsl(var(--chat-sidebar))',
+				'chat-sidebar-hover': 'hsl(var(--chat-sidebar-hover))',
+				'chat-sidebar-active': 'hsl(var(--chat-sidebar-active))',
+				'chat-background': 'hsl(var(--chat-background))',
+				'chat-header': 'hsl(var(--chat-header))',
+				'message-sent': 'hsl(var(--message-sent))',
+				'message-sent-foreground': 'hsl(var(--message-sent-foreground))',
+				'message-received': 'hsl(var(--message-received))',
+				'message-received-foreground': 'hsl(var(--message-received-foreground))',
+				'status-online': 'hsl(var(--status-online))',
+				'status-away': 'hsl(var(--status-away))',
+				'status-offline': 'hsl(var(--status-offline))',
 				sidebar: {
 					DEFAULT: 'hsl(var(--sidebar-background))',
 					foreground: 'hsl(var(--sidebar-foreground))',
