@@ -1,42 +1,60 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { Navigation } from "@/components/layout/Navigation";
-import { ChatListSkeleton, ChatWindowSkeleton } from "@/components/layout/LoadingSkeleton";
+import { useParams } from "react-router-dom";
 import { Sidebar } from "@/components/chat/Sidebar";
 import { ChatWindow } from "@/components/chat/ChatWindow";
 import { MobileLayout } from "@/components/chat/MobileLayout";
+import { Navigation } from "@/components/layout/Navigation";
 import { useToast } from "@/hooks/use-toast";
 import { mockContacts, generateMockMessages } from "@/data/mockData";
 import type { MessageData } from "@/components/chat/Message";
 
-export default function Index() {
-  const navigate = useNavigate();
+interface Contact {
+  id: string;
+  name: string;
+  avatar?: string;
+  lastMessage: string;
+  timestamp: string;
+  unreadCount: number;
+  isOnline: boolean;
+  isGroup?: boolean;
+  lastSeen?: string;
+}
+
+interface ChatContact extends Contact {
+  messages?: MessageData[];
+}
+
+export default function Chat() {
+  const { id } = useParams();
   const { toast } = useToast();
   const [isDark, setIsDark] = useState(false);
-  const [selectedContactId, setSelectedContactId] = useState<string | undefined>();
+  const [selectedContactId, setSelectedContactId] = useState<string | undefined>(id);
+  const [contacts, setContacts] = useState<ChatContact[]>(mockContacts);
   const [messages, setMessages] = useState<MessageData[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     if (selectedContactId) {
-      setMessages(generateMockMessages());
+      // Load messages for the selected contact
+      const contact = contacts.find(c => c.id === selectedContactId);
+      if (contact) {
+        setMessages(contact.messages || generateMockMessages());
+      }
     }
-  }, [selectedContactId]);
+  }, [selectedContactId, contacts]);
 
   useEffect(() => {
-    // Simulate loading time
-    const timer = setTimeout(() => {
-      setIsLoading(false);
-    }, 1500);
-    
-    return () => clearTimeout(timer);
-  }, []);
+    // Update selected contact when URL parameter changes
+    if (id && id !== selectedContactId) {
+      setSelectedContactId(id);
+    }
+  }, [id]);
 
-  const selectedContact = mockContacts.find(contact => contact.id === selectedContactId);
+  const selectedContact = contacts.find(contact => contact.id === selectedContactId);
 
   const handleContactSelect = (contactId: string) => {
     setSelectedContactId(contactId);
-    navigate(`/chat/${contactId}`);
+    // Update URL without full navigation to maintain state
+    window.history.pushState(null, "", `/chat/${contactId}`);
   };
 
   const handleSendMessage = (messageText: string) => {
@@ -52,15 +70,29 @@ export default function Index() {
 
     setMessages(prev => [...prev, newMessage]);
 
-    // Simulate response
+    // Update last message in contacts list
+    setContacts(prev => prev.map(contact => 
+      contact.id === selectedContactId
+        ? { 
+            ...contact, 
+            lastMessage: messageText,
+            timestamp: "now",
+            messages: [...(contact.messages || []), newMessage]
+          }
+        : contact
+    ));
+
+    // Simulate response after a delay
     setTimeout(() => {
       const responses = [
         "That sounds great!",
-        "I agree with you.", 
+        "I agree with you.",
         "Thanks for sharing!",
         "Interesting point of view.",
         "Let me think about that.",
-        "Sure, no problem!"
+        "Sure, no problem!",
+        "I'll get back to you on this.",
+        "Sounds like a plan!"
       ];
       
       const responseMessage: MessageData = {
@@ -76,10 +108,18 @@ export default function Index() {
 
       setMessages(prev => [...prev, responseMessage]);
 
-      toast({
-        title: "New message",
-        description: `${selectedContact?.name}: ${responseMessage.text}`,
-      });
+      // Update last message in contacts list
+      setContacts(prev => prev.map(contact => 
+        contact.id === selectedContactId
+          ? { 
+              ...contact, 
+              lastMessage: responseMessage.text,
+              timestamp: "now",
+              unreadCount: contact.unreadCount + 1,
+              messages: [...(contact.messages || []), responseMessage]
+            }
+          : contact
+      ));
     }, 1000 + Math.random() * 2000);
   };
 
@@ -87,18 +127,6 @@ export default function Index() {
     setIsDark(!isDark);
     document.documentElement.classList.toggle('dark');
   };
-
-  if (isLoading) {
-    return (
-      <div className={`h-screen flex flex-col ${isDark ? 'dark' : ''}`}>
-        <Navigation />
-        <div className="flex-1 flex overflow-hidden">
-          <ChatListSkeleton />
-          <ChatWindowSkeleton />
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className={`h-screen flex flex-col ${isDark ? 'dark' : ''}`}>
@@ -108,7 +136,7 @@ export default function Index() {
         <MobileLayout
           sidebar={
             <Sidebar
-              contacts={mockContacts}
+              contacts={contacts}
               selectedContactId={selectedContactId}
               onContactSelect={handleContactSelect}
               isDark={isDark}
@@ -118,6 +146,7 @@ export default function Index() {
           showBackButton={!!selectedContactId}
           onBack={() => {
             setSelectedContactId(undefined);
+            window.history.pushState(null, "", "/chat");
           }}
           contactName={selectedContact?.name}
         >
